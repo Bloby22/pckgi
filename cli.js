@@ -1,16 +1,10 @@
 #!/usr/bin/env node
 
-/**
- * Moderní CLI nástroj pro NPM Package Scanner
- * Podporuje pokročilé příkazy, barevný výstup a interaktivní režim
- */
-
 import { createScanner, utils } from './index.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Barevné výstupy bez závislostí
 const colors = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -50,23 +44,18 @@ const emoji = {
   dependencies: '🔗'
 };
 
-/**
- * CLI argument parser
- */
 class ArgParser {
   constructor(args) {
     this.args = args;
     this.command = args[0];
     this.flags = new Map();
     this.positional = [];
-    
     this.parse();
   }
 
   parse() {
     for (let i = 1; i < this.args.length; i++) {
       const arg = this.args[i];
-      
       if (arg.startsWith('--')) {
         const [key, value] = arg.slice(2).split('=');
         this.flags.set(key, value || true);
@@ -91,9 +80,6 @@ class ArgParser {
   }
 }
 
-/**
- * Formátování výstupu
- */
 class OutputFormatter {
   static formatSize(bytes) {
     if (!bytes) return 'Unknown';
@@ -107,7 +93,6 @@ class OutputFormatter {
     const now = new Date();
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
@@ -143,28 +128,22 @@ class OutputFormatter {
   }
 }
 
-/**
- * Hlavní CLI třída
- */
 class NPMCli {
   constructor() {
     this.scanner = createScanner({
       timeout: 10000,
       retries: 3,
-      cacheTtl: 5 * 60 * 1000 // 5 minut
+      cacheTtl: 5 * 60 * 1000
     });
   }
 
   async run(args) {
     const parser = new ArgParser(args);
-    
-    // Help nebo prázdné argumenty
     if (!parser.command || parser.has('help') || parser.has('h')) {
       this.showHelp();
       return;
     }
 
-    // Version
     if (parser.has('version') || parser.has('v')) {
       await this.showVersion();
       return;
@@ -206,13 +185,11 @@ class NPMCli {
 
   showHelp() {
     console.log(c('blue', `${emoji.package} pckgi - Modern NPM Package Scanner\n`));
-    
     console.log(c('bold', 'COMMANDS:'));
     console.log(`  ${c('cyan', 'search, s')} <query>     ${c('gray', 'Search for packages')}`);
     console.log(`  ${c('cyan', 'scan, i')} <package>    ${c('gray', 'Detailed package analysis')}`);
     console.log(`  ${c('cyan', 'compare, c')} <pkg1,pkg2> ${c('gray', 'Compare multiple packages')}`);
     console.log(`  ${c('cyan', 'trending, t')}           ${c('gray', 'Show trending packages')}\n`);
-
     console.log(c('bold', 'OPTIONS:'));
     console.log(`  ${c('yellow', '--json')}              ${c('gray', 'Output in JSON format')}`);
     console.log(`  ${c('yellow', '--limit=N')}           ${c('gray', 'Limit search results (default: 10)')}`);
@@ -221,7 +198,6 @@ class NPMCli {
     console.log(`  ${c('yellow', '--debug')}             ${c('gray', 'Show debug information')}`);
     console.log(`  ${c('yellow', '--help, -h')}          ${c('gray', 'Show this help')}`);
     console.log(`  ${c('yellow', '--version, -v')}       ${c('gray', 'Show version')}\n`);
-
     console.log(c('bold', 'EXAMPLES:'));
     console.log(c('gray', '  pckgi search react --limit=5'));
     console.log(c('gray', '  pckgi scan lodash --json'));
@@ -242,10 +218,7 @@ class NPMCli {
 
   async handleSearch(parser) {
     const query = parser.getPositional(0);
-    if (!query) {
-      throw new Error('Missing search query');
-    }
-
+    if (!query) throw new Error('Missing search query');
     const options = {
       limit: parseInt(parser.get('limit', '10')),
       includeUnstable: parser.has('include-unstable'),
@@ -253,38 +226,26 @@ class NPMCli {
       popularity: parseFloat(parser.get('popularity', '0.5')),
       maintenance: parseFloat(parser.get('maintenance', '0.5'))
     };
-
-    if (parser.has('no-cache')) {
-      this.scanner.clearCache();
-    }
-
+    if (parser.has('no-cache')) this.scanner.clearCache();
     console.log(c('blue', `${emoji.search} Searching: ${query}`));
-    
     const results = await this.scanner.search(query, options);
-    
     if (parser.has('json')) {
       console.log(JSON.stringify(results, null, 2));
       return;
     }
-
     if (results.length === 0) {
       console.log(c('yellow', `${emoji.warning} No packages found for "${query}"`));
       return;
     }
-
     console.log(c('green', `\n${emoji.success} Found ${results.length} packages:\n`));
-
     results.forEach((pkg, i) => {
       const rank = c('dim', `${i + 1}.`.padEnd(3));
       const name = c('bold', pkg.name);
       const version = c('gray', `v${pkg.version}`);
       const score = this.formatScore(pkg.score);
       const author = pkg.author ? c('gray', ` by ${pkg.author}`) : '';
-      
       console.log(`${rank} ${name} ${version} ${score}${author}`);
       console.log(c('dim', `   ${pkg.description.slice(0, 80)}${pkg.description.length > 80 ? '...' : ''}`));
-      
-      // Zobraz klíčová slova
       if (pkg.keywords?.length > 0) {
         const keywords = pkg.keywords.slice(0, 3).map(k => c('cyan', `#${k}`)).join(' ');
         console.log(c('dim', `   ${keywords}`));
@@ -295,91 +256,59 @@ class NPMCli {
 
   async handleScan(parser) {
     const packageName = parser.getPositional(0);
-    if (!packageName) {
-      throw new Error('Missing package name');
-    }
-
+    if (!packageName) throw new Error('Missing package name');
     const options = {
       includeDownloads: true,
       includeDependencies: !parser.has('no-deps')
     };
-
-    if (parser.has('no-cache')) {
-      this.scanner.clearCache();
-    }
-
+    if (parser.has('no-cache')) this.scanner.clearCache();
     console.log(c('blue', `${emoji.scan} Analyzing: ${packageName}`));
-    
     const info = await this.scanner.scan(packageName, options);
-    
     if (parser.has('json')) {
       console.log(JSON.stringify(info, null, 2));
       return;
     }
-
     this.displayPackageInfo(info);
   }
 
   async handleCompare(parser) {
     const packagesList = parser.getPositional(0);
-    if (!packagesList) {
-      throw new Error('Missing package names (use comma-separated list)');
-    }
-
+    if (!packagesList) throw new Error('Missing package names (use comma-separated list)');
     const packages = packagesList.split(',').map(p => p.trim());
-    
-    if (packages.length < 2) {
-      throw new Error('Need at least 2 packages to compare');
-    }
-
+    if (packages.length < 2) throw new Error('Need at least 2 packages to compare');
     console.log(c('blue', `${emoji.compare} Comparing: ${packages.join(', ')}`));
-    
     const results = await this.scanner.compare(packages);
-    
     if (parser.has('json')) {
       console.log(JSON.stringify(results, null, 2));
       return;
     }
-
     this.displayComparison(results);
   }
 
   async handleTrending(parser) {
     const limit = parseInt(parser.get('limit', '10'));
-    
-    // Vyhledej populární knihovny
     const trendingQueries = ['react', 'vue', 'angular', 'nodejs', 'typescript', 'javascript'];
     const allResults = [];
-    
     console.log(c('blue', `${emoji.fire} Fetching trending packages...`));
-    
     for (const query of trendingQueries) {
       try {
         const results = await this.scanner.search(query, { limit: 5 });
         allResults.push(...results);
-      } catch (error) {
-        // Ignoruj chyby při získávání trendů
-      }
+      } catch {}
     }
-
-    // Seřaď podle popularity a odstraň duplikáty
     const unique = Array.from(new Map(allResults.map(pkg => [pkg.name, pkg])).values())
       .sort((a, b) => b.score.popularity - a.score.popularity)
       .slice(0, limit);
-
     if (parser.has('json')) {
       console.log(JSON.stringify(unique, null, 2));
       return;
     }
-
     console.log(c('green', `\n${emoji.fire} Trending packages:\n`));
-    
     unique.forEach((pkg, i) => {
       const rank = c('dim', `${i + 1}.`.padEnd(3));
       const name = c('bold', pkg.name);
       const version = c('gray', `v${pkg.version}`);
       const popularity = c('yellow', `${emoji.star} ${pkg.score.popularity}%`);
-      
       console.log(`${rank} ${name} ${version} ${popularity}`);
       console.log(c('dim', `   ${pkg.description.slice(0, 80)}${pkg.description.length > 80 ? '...' : ''}\n`));
     });
@@ -389,21 +318,17 @@ class NPMCli {
     const healthEmoji = OutputFormatter.getHealthEmoji(info.health);
     const healthColor = OutputFormatter.getHealthColor(info.health);
     
-    // Header
     console.log(c('green', `\n${emoji.package} Package Analysis\n`));
     
-    // Health status
     console.log(c('bold', 'HEALTH STATUS:'));
     console.log(`${healthEmoji} ${c(healthColor, info.health.toUpperCase())} ${c('gray', `(${info.healthScore}/100)`)}\n`);
-    
-    // Basic info
+  
     console.log(c('bold', 'BASIC INFO:'));
     console.log(`${emoji.package} ${c('bold', info.name)} ${c('gray', `v${info.version}`)}`);
     console.log(`${emoji.info} ${info.description || 'No description'}`);
     console.log(`${emoji.author} ${info.author || 'Unknown author'}`);
     console.log(`${emoji.license} ${info.license || 'No license'}\n`);
     
-    // Stats
     console.log(c('bold', 'STATISTICS:'));
     console.log(`${emoji.download} ${c('cyan', utils.formatNumber(info.downloads.week))} downloads/week`);
     console.log(`${emoji.download} ${c('cyan', utils.formatNumber(info.downloads.month))} downloads/month`);
@@ -411,7 +336,6 @@ class NPMCli {
     console.log(`${emoji.version} ${c('magenta', info.totalVersions)} total versions`);
     console.log(`${emoji.dependencies} ${c('blue', info.dependencies.total)} dependencies (${info.dependencies.prod} prod)\n`);
     
-    // Version info
     if (info.versionInfo) {
       console.log(c('bold', 'VERSION INFO:'));
       console.log(`${emoji.version} ${info.versionInfo.major}.${info.versionInfo.minor}.${info.versionInfo.patch}`);
@@ -421,7 +345,6 @@ class NPMCli {
       console.log(`${info.versionInfo.isStable ? '✅' : '⚠️'} ${info.versionInfo.isStable ? 'Stable' : 'Unstable'} release\n`);
     }
     
-    // Bundle info
     if (info.bundleInfo) {
       console.log(c('bold', 'BUNDLE INFO:'));
       console.log(`${info.bundleInfo.hasTypes ? '✅' : '❌'} TypeScript definitions`);
@@ -430,7 +353,6 @@ class NPMCli {
       console.log();
     }
     
-    // Warnings
     if (info.deprecated) {
       console.log(c('red', `${emoji.deprecated} DEPRECATED: ${info.deprecatedMessage || 'This package is deprecated!'}\n`));
     }
@@ -459,7 +381,6 @@ class NPMCli {
       return;
     }
     
-    // Tabulka porovnání
     const headers = ['Package', 'Version', 'Health', 'Downloads/week', 'Last Update', 'Dependencies'];
     const rows = successful.map(r => {
       const info = r.data;
@@ -481,12 +402,10 @@ class NPMCli {
       Math.max(header.length, ...rows.map(row => this.stripColors(row[i]).length))
     );
     
-    // Header
     const headerRow = headers.map((h, i) => c('bold', h.padEnd(colWidths[i]))).join(' │ ');
     console.log(headerRow);
     console.log('─'.repeat(headerRow.replace(/\x1b\[[0-9;]*m/g, '').length));
-    
-    // Rows
+
     rows.forEach(row => {
       const formattedRow = row.map((cell, i) => {
         const stripped = this.stripColors(cell);
@@ -511,11 +430,9 @@ class NPMCli {
   }
 }
 
-// Main execution
 const cli = new NPMCli();
 const args = process.argv.slice(2);
 
-// Graceful error handling
 process.on('unhandledRejection', (error) => {
   console.error(c('red', `${emoji.error} Unhandled error: ${error.message}`));
   process.exit(1);
@@ -526,7 +443,6 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Run CLI
 cli.run(args).catch((error) => {
   console.error(c('red', `${emoji.error} ${error.message}`));
   process.exit(1);
