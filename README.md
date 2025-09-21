@@ -36,12 +36,6 @@ pckgi scan lodash
 pckgi info express --json
 ```
 
-### Compare packages
-```bash
-pckgi compare react,vue,angular
-pckgi compare lodash,underscore,ramda --json
-```
-
 ### Discover trending packages
 ```bash
 pckgi trending
@@ -54,20 +48,7 @@ pckgi trending --limit=20
 |---------|--------|-------------|
 | `search <query>` | `s` | Search for packages |
 | `scan <package>` | `info`, `i` | Analyze package health |
-| `compare <pkg1,pkg2,...>` | `comp`, `c` | Compare multiple packages |
 | `trending` | `t` | Show trending packages |
-
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--json` | Output results in JSON format |
-| `--limit=N` | Limit number of results (default: 10) |
-| `--no-cache` | Skip cache and fetch fresh data |
-| `--include-unstable` | Include pre-release versions |
-| `--debug` | Show debug information |
-| `--help`, `-h` | Show help information |
-| `--version`, `-v` | Show version |
 
 ## Examples
 
@@ -122,28 +103,9 @@ BUNDLE INFO:
 📦 ESM: index.js
 ```
 
-### Package comparison
-```bash
-$ pckgi compare react,vue,angular
-
-⚖️ Comparing: react, vue, angular
-
-Package │ Version │ Health      │ Downloads/week │ Last Update │ Dependencies
-────────┼─────────┼─────────────┼────────────────┼─────────────┼─────────────
-react   │ v19.1.1 │ 🟢 excellent│ 44.5M          │ 1 month ago │ 0
-vue     │ v3.5.13 │ 🟢 excellent│ 4.8M           │ 2 weeks ago │ 5
-angular │ v19.1.5 │ 🟢 excellent│ 3.2M           │ 1 week ago  │ 0
-```
-
 ### JSON output for automation
 ```bash
-$ pckgi scan express --json | jq '.health'
-"excellent"
-
-$ pckgi search "test framework" --json --limit=3 | jq '.[].name'
-"jest"
-"mocha" 
-"jasmine"
+$ pckgi scan express --json
 ```
 
 ## Health Scoring System
@@ -179,59 +141,13 @@ The scanner uses official NPM registry APIs:
 ## Development
 
 ```bash
-# Clone repository
-git clone https://github.com/bloby22/pckgi.git
-cd pckgi
-
-# Install dependencies
-npm install
-
-# Link for development
-npm link
-
-# Run tests
-npm test
-
-# Debug mode
-pckgi search react --debug
+npm install pckgi
 ```
 
 ## Requirements
 
 - Node.js >= 14.0.0
 - NPM or Yarn
-
-## Performance
-
-- **Fast searches** - Parallel API calls with intelligent caching
-- **Optimized output** - Minimal dependencies, native terminal colors
-- **Memory efficient** - Streaming JSON parsing, garbage collection friendly
-- **Network resilient** - Automatic retries, timeout handling
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Changelog
-
-### v1.0.0
-- Initial release
-- Package search and analysis
-- Health scoring system
-- Package comparison
-- Trending packages discovery
-- JSON export support
-- Modern ES modules architecture
-
----
 
 **Built with ❤️ for the JavaScript community**
 
