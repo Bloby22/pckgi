@@ -1,0 +1,36 @@
+{
+  "name": "pckgi",
+  "version": "1.0.4",
+  "description": "",
+  "main": "index.js",
+  "bin": {
+    "pckgi": "./cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "search": "node cli.js search",
+    "scan": "node cli.js scan"
+  },
+  "keywords": [
+    "npm",
+    "package",
+    "scan",
+    "health",
+    "check",
+    "cli"
+  ],
+  "author": "BlobyCZ",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.12.2",
+    "chalk": "^4.1.2",
+    "commander": "^14.0.1",
+    "fs-extra": "^11.3.2",
+    "inquirer": "^12.9.6",
+    "ora": "^9.0.0",
+    "semver": "^7.7.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
