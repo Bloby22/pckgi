@@ -136,13 +136,7 @@ The scanner uses official NPM registry APIs:
 - NPM Download API - Download statistics
 - Intelligent caching with 5-minute TTL
 - Retry logic with exponential backoff
-- Rate limiting and error handling
-
-## Development
-
-```bash
-npm install pckgi
-```
+- Rate limiting and error handling
 
 ## Requirements
 
