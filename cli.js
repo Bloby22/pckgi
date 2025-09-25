@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
 import { createScanner, utils } from './index.js';
-import { readFile } from 'fs/promises';
+import { exec } from 'child_process';
+import { readFile, mkdir } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const colors = {
   reset: '\x1b[0m',
@@ -37,7 +41,6 @@ const emoji = {
   fire: '🔥',
   star: '⭐',
   clock: '🕐',
-  download: '📥',
   author: '👤',
   license: '📄',
   version: '🏷️',
@@ -296,154 +299,75 @@ class NPMCli {
         allResults.push(...results);
       } catch {}
     }
-    const unique = Array.from(new Map(allResults.map(pkg => [pkg.name, pkg])).values())
-      .sort((a, b) => b.score.popularity - a.score.popularity)
+    const unique = new Map();
+    allResults.forEach(pkg => {
+      if (!unique.has(pkg.name)) unique.set(pkg.name, pkg);
+    });
+    const trending = Array.from(unique.values())
+      .sort((a, b) => b.score.final - a.score.final)
       .slice(0, limit);
     if (parser.has('json')) {
-      console.log(JSON.stringify(unique, null, 2));
+      console.log(JSON.stringify(trending, null, 2));
       return;
     }
-    console.log(c('green', `\n${emoji.fire} Trending packages:\n`));
-    unique.forEach((pkg, i) => {
+    console.log(c('green', `\n${emoji.star} Trending packages:\n`));
+    trending.forEach((pkg, i) => {
       const rank = c('dim', `${i + 1}.`.padEnd(3));
       const name = c('bold', pkg.name);
       const version = c('gray', `v${pkg.version}`);
-      const popularity = c('yellow', `${emoji.star} ${pkg.score.popularity}%`);
-      console.log(`${rank} ${name} ${version} ${popularity}`);
-      console.log(c('dim', `   ${pkg.description.slice(0, 80)}${pkg.description.length > 80 ? '...' : ''}\n`));
+      const score = this.formatScore(pkg.score);
+      console.log(`${rank} ${name} ${version} ${score}`);
+      console.log(c('dim', `   ${pkg.description.slice(0, 80)}${pkg.description.length > 80 ? '...' : ''}`));
+      if (pkg.keywords?.length > 0) {
+        const keywords = pkg.keywords.slice(0, 3).map(k => c('cyan', `#${k}`)).join(' ');
+        console.log(c('dim', `   ${keywords}`));
+      }
+      console.log();
     });
   }
 
+  formatScore(score) {
+    if (!score) return '';
+    const final = (score.final * 100).toFixed(1);
+    return c('yellow', `[${final}%]`);
+  }
+
   displayPackageInfo(info) {
-    const healthEmoji = OutputFormatter.getHealthEmoji(info.health);
-    const healthColor = OutputFormatter.getHealthColor(info.health);
-    
-    console.log(c('green', `\n${emoji.package} Package Analysis\n`));
-    
-    console.log(c('bold', 'HEALTH STATUS:'));
-    console.log(`${healthEmoji} ${c(healthColor, info.health.toUpperCase())} ${c('gray', `(${info.healthScore}/100)`)}\n`);
-  
-    console.log(c('bold', 'BASIC INFO:'));
-    console.log(`${emoji.package} ${c('bold', info.name)} ${c('gray', `v${info.version}`)}`);
-    console.log(`${emoji.info} ${info.description || 'No description'}`);
-    console.log(`${emoji.author} ${info.author || 'Unknown author'}`);
-    console.log(`${emoji.license} ${info.license || 'No license'}\n`);
-    
-    console.log(c('bold', 'STATISTICS:'));
-    console.log(`${emoji.download} ${c('cyan', utils.formatNumber(info.downloads.week))} downloads/week`);
-    console.log(`${emoji.download} ${c('cyan', utils.formatNumber(info.downloads.month))} downloads/month`);
-    console.log(`${emoji.clock} Last update: ${c('yellow', OutputFormatter.formatDate(info.lastUpdate))}`);
-    console.log(`${emoji.version} ${c('magenta', info.totalVersions)} total versions`);
-    console.log(`${emoji.dependencies} ${c('blue', info.dependencies.total)} dependencies (${info.dependencies.prod} prod)\n`);
-    
-    if (info.versionInfo) {
-      console.log(c('bold', 'VERSION INFO:'));
-      console.log(`${emoji.version} ${info.versionInfo.major}.${info.versionInfo.minor}.${info.versionInfo.patch}`);
-      if (info.versionInfo.prerelease) {
-        console.log(`${emoji.warning} Pre-release: ${info.versionInfo.prerelease}`);
-      }
-      console.log(`${info.versionInfo.isStable ? '✅' : '⚠️'} ${info.versionInfo.isStable ? 'Stable' : 'Unstable'} release\n`);
-    }
-    
-    if (info.bundleInfo) {
-      console.log(c('bold', 'BUNDLE INFO:'));
-      console.log(`${info.bundleInfo.hasTypes ? '✅' : '❌'} TypeScript definitions`);
-      if (info.bundleInfo.main) console.log(`📄 Main: ${info.bundleInfo.main}`);
-      if (info.bundleInfo.module) console.log(`📦 ESM: ${info.bundleInfo.module}`);
-      console.log();
-    }
-    
-    if (info.deprecated) {
-      console.log(c('red', `${emoji.deprecated} DEPRECATED: ${info.deprecatedMessage || 'This package is deprecated!'}\n`));
-    }
-    
-    if (info.daysSinceUpdate > 365) {
-      console.log(c('yellow', `${emoji.warning} Package hasn't been updated for ${Math.floor(info.daysSinceUpdate / 365)} year(s)\n`));
+    const { name, version, description, date, health, popularity, maintenance, license, author, links } = info;
+    console.log(`${c('bold', name)} ${c('gray', `v${version}`)}`);
+    if (description) console.log(description);
+    if (author) console.log(`${emoji.author} Author: ${author}`);
+    if (license) console.log(`${emoji.license} License: ${license}`);
+    if (date) console.log(`${emoji.clock} Updated: ${OutputFormatter.formatDate(date)}`);
+    if (links?.homepage) console.log(`🏠 Homepage: ${links.homepage}`);
+    if (links?.repository) console.log(`📂 Repository: ${links.repository}`);
+    if (links?.npm) console.log(`📦 NPM: ${links.npm}`);
+
+    console.log('\nHealth:');
+    console.log(`  Quality:     ${c(OutputFormatter.getHealthColor(health.quality), health.quality)} ${OutputFormatter.getHealthEmoji(health.quality)}`);
+    console.log(`  Popularity:  ${c(OutputFormatter.getHealthColor(health.popularity), health.popularity)} ${OutputFormatter.getHealthEmoji(health.popularity)}`);
+    console.log(`  Maintenance: ${c(OutputFormatter.getHealthColor(health.maintenance), health.maintenance)} ${OutputFormatter.getHealthEmoji(health.maintenance)}`);
+
+    if (info.dependencies) {
+      console.log(`\nDependencies (${info.dependencies.length}):`);
+      info.dependencies.forEach(dep => {
+        console.log(`  - ${dep.name} v${dep.version}`);
+      });
     }
   }
 
   displayComparison(results) {
-    console.log(c('green', `\n${emoji.compare} Package Comparison\n`));
-    
-    const successful = results.filter(r => r.success);
-    const failed = results.filter(r => !r.success);
-    
-    if (failed.length > 0) {
-      console.log(c('red', 'FAILED TO ANALYZE:'));
-      failed.forEach(r => {
-        console.log(`${emoji.error} ${r.name}: ${r.error}`);
-      });
+    results.forEach(pkg => {
+      console.log(`${c('bold', pkg.name)} v${pkg.version}`);
+      console.log(`  Quality:     ${c(OutputFormatter.getHealthColor(pkg.score.quality), (pkg.score.quality * 100).toFixed(1) + '%')}`);
+      console.log(`  Popularity:  ${c(OutputFormatter.getHealthColor(pkg.score.popularity), (pkg.score.popularity * 100).toFixed(1) + '%')}`);
+      console.log(`  Maintenance: ${c(OutputFormatter.getHealthColor(pkg.score.maintenance), (pkg.score.maintenance * 100).toFixed(1) + '%')}`);
       console.log();
-    }
-    
-    if (successful.length === 0) {
-      console.log(c('red', 'No packages could be analyzed'));
-      return;
-    }
-    
-    const headers = ['Package', 'Version', 'Health', 'Downloads/week', 'Last Update', 'Dependencies'];
-    const rows = successful.map(r => {
-      const info = r.data;
-      return [
-        c('bold', info.name),
-        c('gray', `v${info.version}`),
-        `${OutputFormatter.getHealthEmoji(info.health)} ${c(OutputFormatter.getHealthColor(info.health), info.health)}`,
-        c('cyan', utils.formatNumber(info.downloads.week)),
-        c('yellow', OutputFormatter.formatDate(info.lastUpdate)),
-        c('blue', info.dependencies.total.toString())
-      ];
     });
-    
-    this.printTable(headers, rows);
-  }
-
-  printTable(headers, rows) {
-    const colWidths = headers.map((header, i) => 
-      Math.max(header.length, ...rows.map(row => this.stripColors(row[i]).length))
-    );
-    
-    const headerRow = headers.map((h, i) => c('bold', h.padEnd(colWidths[i]))).join(' │ ');
-    console.log(headerRow);
-    console.log('─'.repeat(headerRow.replace(/\x1b\[[0-9;]*m/g, '').length));
-
-    rows.forEach(row => {
-      const formattedRow = row.map((cell, i) => {
-        const stripped = this.stripColors(cell);
-        const padding = colWidths[i] - stripped.length;
-        return cell + ' '.repeat(padding);
-      }).join(' │ ');
-      console.log(formattedRow);
-    });
-  }
-
-  stripColors(str) {
-    return str.replace(/\x1b\[[0-9;]*m/g, '');
-  }
-
-  formatScore(score) {
-    const final = score.final;
-    let color = 'red';
-    if (final >= 80) color = 'green';
-    else if (final >= 60) color = 'yellow';
-    
-    return c(color, `${final}%`);
   }
 }
 
-const cli = new NPMCli();
-const args = process.argv.slice(2);
-
-process.on('unhandledRejection', (error) => {
-  console.error(c('red', `${emoji.error} Unhandled error: ${error.message}`));
-  process.exit(1);
-});
-
-process.on('SIGINT', () => {
-  console.log(c('yellow', '\n👋 Goodbye!'));
-  process.exit(0);
-});
-
-cli.run(args).catch((error) => {
-  console.error(c('red', `${emoji.error} ${error.message}`));
-  process.exit(1);
-});
+(async () => {
+  const cli = new NPMCli();
+  await cli.run(process.argv.slice(2));
+})();
