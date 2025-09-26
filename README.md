@@ -1,148 +1,110 @@
-# pckgi
+# 📦 pckgi — Modern NPM Package Scanner
 
-> Modern NPM package scanner and analyzer CLI tool
+![pckgi logo](https://raw.githubusercontent.com/your-repo/pckgi/master/assets/logo.png)
 
-A fast, intelligent command-line tool for searching, analyzing, and comparing NPM packages with advanced health scoring and beautiful terminal output.
+---
 
-## Features
+## 🚀 Status
 
-- **Smart Search** - Find packages with quality, popularity, and maintenance scoring
-- **Health Analysis** - Comprehensive package health evaluation with scoring system
-- **Package Comparison** - Side-by-side comparison of multiple packages
-- **Trending Packages** - Discover popular and trending packages
-- **Rich Output** - Beautiful terminal output with colors and emojis
-- **JSON Export** - Machine-readable output for automation
-- **Fast & Cached** - Intelligent caching for improved performance
-- **Modern Architecture** - Built with ES modules and native fetch API
+- Current version: **v1.1.3**
+- Stable & actively maintained
+- Supports full package scanning, search, comparison, auditing, and more
+- Designed for speed, usability & detailed insights
+- No known critical vulnerabilities
+- CLI tool for developers who want quick NPM package analysis
 
-## Installation
+---
+
+## 🛠️ Tech Stack
+
+- Node.js
+- NPM Registry API
+- Custom caching & retry logic
+- CLI interface with intuitive commands & flags
+- JSON, CSV & Markdown output support
+- Async operations for fast network requests
+
+---
+
+## 💡 Overview
+
+`pckgi` is a modern CLI tool to scan, analyze, compare, and audit NPM packages.  
+It helps developers get detailed insights about packages without leaving the terminal.
+
+---
+
+## 📖 Usage & Commands
+
+Run the CLI with a command or `pckgi help` to see all options.
+
+### Core Commands
+
+| Command            | Description                    | Alias       |
+|--------------------|-------------------------------|-------------|
+| `search <query>`    | Search for packages            | `s`         |
+| `scan <package>`    | Detailed package analysis      | `i`         |
+| `compare <pkg1,pkg2>`| Compare multiple packages     | `c`         |
+| `trending`          | Show trending packages         | `t`         |
+
+### Analysis Commands
+
+| Command              | Description                       | Alias       |
+|----------------------|---------------------------------|-------------|
+| `audit [package]`    | Security audit analysis           | `a`         |
+| `deps <package>`     | Dependency tree analysis          | `d`         |
+| `outdated [package]` | Check for outdated packages       | `o`         |
+| `size <package>`     | Bundle size analysis              | —           |
+| `stats <package>`    | Detailed package statistics       | —           |
+| `history <package>`  | Version history and changelog     | —           |
+
+### Utility Commands
+
+| Command               | Description                         | Alias       |
+|-----------------------|-----------------------------------|-------------|
+| `export [format]`      | Export data (json, csv, md)        | `e`         |
+| `validate <package>`   | Validate package integrity          | —           |
+| `backup`              | Backup package.json dependencies    | —           |
+| `help`                | Show this help message              | —           |
+
+---
+
+## ⚙️ Options
+
+| Flag                      | Description                          | Default     |
+|---------------------------|------------------------------------|-------------|
+| `--json`                  | Output in JSON format               | false       |
+| `--csv`                   | Output in CSV format                | false       |
+| `--markdown`, `--md`      | Output in Markdown format           | false       |
+| `--limit=N`               | Limit results                      | 10          |
+| `--depth=N`               | Dependency depth                   | 3           |
+| `--no-cache`              | Skip cache                        | false       |
+| `--include-dev`           | Include dev dependencies          | false       |
+| `--include-unstable`      | Include pre-release versions      | false       |
+| `--output=file`           | Save output to file               | —           |
+| `--verbose`               | Show detailed information          | false       |
+| `--debug`                 | Show debug information             | false       |
+| `--help`, `-h`            | Show help                        | false       |
+| `--version`, `-v`         | Show version                     | false       |
+
+---
+
+## 📚 Examples
 
 ```bash
-npm install -g pckgi
-```
-
-## Usage
-
-### Search packages
-```bash
-pckgi search react
-pckgi search "date manipulation" --limit=5
-pckgi search typescript --include-unstable
-```
-
-### Analyze package health
-```bash
-pckgi scan lodash
-pckgi info express --json
-```
-
-### Discover trending packages
-```bash
-pckgi trending
+pckgi search react --limit=5
+pckgi scan lodash --json --output=report.json
+pckgi compare react,vue,angular --md
+pckgi audit express --verbose
+pckgi deps webpack --depth=2
+pckgi size react --include-dev
 pckgi trending --limit=20
+pckgi export csv --output=packages.csv
+pckgi help
 ```
 
-## Commands
+---
 
-| Command | Alias | Description |
-|---------|--------|-------------|
-| `search <query>` | `s` | Search for packages |
-| `scan <package>` | `info`, `i` | Analyze package health |
-| `trending` | `t` | Show trending packages |
-
-## Examples
-
-### Basic search
+## 🛫 Installation
 ```bash
-$ pckgi search lodash
-
-🔍 Searching: lodash
-
-✅ Found 10 packages:
-
-1.  lodash v4.17.21 95%
-    A modern JavaScript utility library delivering modularity, performance & extras.
-    #util #functional #server #client #browser
-
-2.  lodash.get v4.4.2 78%
-    The lodash method `_.get` exported as a module.
-    #lodash-modularized
+npm install pckgi
 ```
-
-### Package analysis
-```bash
-$ pckgi scan react
-
-📊 Analyzing: react
-
-📦 Package Analysis
-
-HEALTH STATUS:
-🟢 EXCELLENT (100/100)
-
-BASIC INFO:
-📦 react v19.1.1
-ℹ️ React is a JavaScript library for building user interfaces.
-👤 Meta
-📄 MIT
-
-STATISTICS:
-📥 44.5M downloads/week
-📥 194.4M downloads/month
-🕐 Last update: 1 month ago
-🏷️ 2507 total versions
-🔗 0 dependencies (0 prod)
-
-VERSION INFO:
-🏷️ 19.1.1
-✅ Stable release
-
-BUNDLE INFO:
-❌ TypeScript definitions
-📄 Main: index.js
-📦 ESM: index.js
-```
-
-### JSON output for automation
-```bash
-$ pckgi scan express --json
-```
-
-## Health Scoring System
-
-Packages are evaluated based on multiple factors:
-
-- **Download Statistics** - Weekly/monthly download counts
-- **Maintenance** - Last update recency and frequency
-- **Version Stability** - Semantic versioning compliance
-- **Dependencies** - Dependency count and health
-- **Community** - GitHub stars, maintainer count
-
-### Health Levels
-
-- 🟢 **Excellent** (80-100) - Actively maintained, popular, stable
-- ✅ **Good** (60-79) - Well maintained, reliable
-- 🟡 **Fair** (40-59) - Acceptable but may have issues
-- ⚠️ **Poor** (20-39) - Outdated or low usage
-- 🔴 **Critical** (0-19) - Deprecated or abandoned
-- 💀 **Deprecated** - Officially deprecated
-- 🚨 **Vulnerable** - Known security vulnerabilities
-
-## API Integration
-
-The scanner uses official NPM registry APIs:
-
-- NPM Registry API - Package metadata
-- NPM Download API - Download statistics
-- Intelligent caching with 5-minute TTL
-- Retry logic with exponential backoff
-- Rate limiting and error handling
-
-## Requirements
-
-- Node.js >= 14.0.0
-- NPM or Yarn
-
-**Built with ❤️ for the JavaScript community**
-
-For issues and feature requests, please visit [GitHub Issues](https://github.com/bloby22/pckgi/issues).
