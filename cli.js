@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { createScanner, utils } from './index.js';
+import { createScanner } from './index.js';
 import { exec } from 'child_process';
-import { readFile, mkdir, writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
@@ -108,6 +108,7 @@ class OutputFormatter {
   }
 
   static formatDate(dateStr) {
+    if (!dateStr) return 'Unknown';
     const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now - date;
@@ -122,6 +123,7 @@ class OutputFormatter {
   }
 
   static formatNumber(num) {
+    if (!num) return '0';
     if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`;
     if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
     if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
@@ -129,6 +131,12 @@ class OutputFormatter {
   }
 
   static getHealthColor(status) {
+    if (typeof status === 'number') {
+      if (status >= 0.8) return 'green';
+      if (status >= 0.6) return 'yellow';
+      return 'red';
+    }
+    
     const colorMap = {
       excellent: 'green',
       good: 'green',
@@ -141,10 +149,16 @@ class OutputFormatter {
       medium: 'yellow',
       low: 'red'
     };
-    return colorMap[status] || 'gray';
+    return colorMap[status?.toLowerCase()] || 'gray';
   }
 
   static getHealthEmoji(status) {
+    if (typeof status === 'number') {
+      if (status >= 0.8) return '🟢';
+      if (status >= 0.6) return '🟡';
+      return '🔴';
+    }
+    
     const emojiMap = {
       excellent: '🟢',
       good: '✅',
@@ -157,7 +171,7 @@ class OutputFormatter {
       medium: '🟡',
       low: '🔴'
     };
-    return emojiMap[status] || '⚪';
+    return emojiMap[status?.toLowerCase()] || '⚪';
   }
 
   static createProgressBar(current, total, width = 20) {
@@ -173,7 +187,7 @@ class OutputFormatter {
     
     rows.forEach(row => {
       row.forEach((cell, i) => {
-        const cleanCell = cell.replace(/\x1b\[[0-9;]*m/g, '');
+        const cleanCell = String(cell).replace(/\x1b\[[0-9;]*m/g, '');
         colWidths[i] = Math.max(colWidths[i], cleanCell.length);
       });
     });
@@ -187,7 +201,7 @@ class OutputFormatter {
     
     rows.forEach(row => {
       const rowStr = row.map((cell, i) => {
-        const cleanCell = cell.replace(/\x1b\[[0-9;]*m/g, '');
+        const cleanCell = String(cell).replace(/\x1b\[[0-9;]*m/g, '');
         const padding = colWidths[i] - cleanCell.length;
         return cell + ' '.repeat(padding);
       }).join(' │ ');
@@ -257,7 +271,6 @@ class NPMCli {
           await this.handleSize(parser);
           break;
         case 'history':
-        case 'h':
           await this.handleHistory(parser);
           break;
         case 'stats':
@@ -272,6 +285,9 @@ class NPMCli {
           break;
         case 'backup':
           await this.handleBackup(parser);
+          break;
+        case 'help':
+          this.showHelp();
           break;
         default:
           console.error(c('red', `${emoji.error} Unknown command: ${parser.command}`));
@@ -307,7 +323,8 @@ class NPMCli {
     console.log(c('bold', 'UTILITY COMMANDS:'));
     console.log(`  ${c('cyan', 'export, e')} [format]   ${c('gray', 'Export data (json, csv, md)')}`);
     console.log(`  ${c('cyan', 'validate')} <package>   ${c('gray', 'Validate package integrity')}`);
-    console.log(`  ${c('cyan', 'backup')}              ${c('gray', 'Backup package.json dependencies')}\n`);
+    console.log(`  ${c('cyan', 'backup')}              ${c('gray', 'Backup package.json dependencies')}`);
+    console.log(`  ${c('cyan', 'help')}                ${c('gray', 'Show this help message')}\n`);
     
     console.log(c('bold', 'OPTIONS:'));
     console.log(`  ${c('yellow', '--json')}              ${c('gray', 'Output in JSON format')}`);
@@ -330,16 +347,15 @@ class NPMCli {
     console.log(c('gray', '  pckgi compare react,vue,angular --md'));
     console.log(c('gray', '  pckgi audit express --verbose'));
     console.log(c('gray', '  pckgi deps webpack --depth=2'));
-    console.log(c('gray', '  pckgi size react --include-dev'));
     console.log(c('gray', '  pckgi trending --limit=20'));
-    console.log(c('gray', '  pckgi export csv --output=packages.csv'));
+    console.log(c('gray', '  pckgi export json --output=packages.json'));
   }
 
   async showVersion() {
     try {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = dirname(__filename);
-      const packageJson = JSON.parse(await readFile(join(__dirname, 'package.json'), 'utf-8'));
+      const packageJson = JSON.parse(await readFile(join(__dirname, '..', 'package.json'), 'utf-8'));
       console.log(c('blue', `${emoji.info} pckgi v${packageJson.version}`));
     } catch {
       console.log(c('blue', `${emoji.info} pckgi v2.0.0`));
@@ -352,10 +368,7 @@ class NPMCli {
     
     const options = {
       limit: parseInt(parser.get('limit', '10')),
-      includeUnstable: parser.has('include-unstable'),
-      quality: parseFloat(parser.get('quality', '0.5')),
-      popularity: parseFloat(parser.get('popularity', '0.5')),
-      maintenance: parseFloat(parser.get('maintenance', '0.5'))
+      includeUnstable: parser.has('include-unstable')
     };
 
     if (parser.has('no-cache')) this.scanner.clearCache();
@@ -399,7 +412,7 @@ class NPMCli {
 
   async handleTrending(parser) {
     const limit = parseInt(parser.get('limit', '10'));
-    const trendingQueries = ['react', 'vue', 'angular', 'nodejs', 'typescript', 'javascript'];
+    const trendingQueries = ['react', 'vue', 'angular', 'nodejs', 'typescript'];
     const allResults = [];
     
     console.log(c('blue', `${emoji.fire} Fetching trending packages...`));
@@ -408,7 +421,9 @@ class NPMCli {
       try {
         const results = await this.scanner.search(query, { limit: 5 });
         allResults.push(...results);
-      } catch {}
+      } catch (err) {
+        // Ignorujeme chyby při trendingovém vyhledávání
+      }
     }
     
     const unique = new Map();
@@ -417,7 +432,7 @@ class NPMCli {
     });
     
     const trending = Array.from(unique.values())
-      .sort((a, b) => b.score.final - a.score.final)
+      .sort((a, b) => (b.score?.final || 0) - (a.score?.final || 0))
       .slice(0, limit);
     
     await this.outputResults(trending, parser, 'trending');
@@ -428,8 +443,12 @@ class NPMCli {
     console.log(c('blue', `${emoji.audit} Security audit${packageName ? `: ${packageName}` : ''}...`));
     
     if (packageName) {
-      const auditInfo = await this.scanner.auditPackage(packageName);
-      await this.outputResults(auditInfo, parser, 'audit');
+      try {
+        const info = await this.scanner.scan(packageName, { includeVulnerabilities: true });
+        await this.outputResults({ vulnerabilities: info.vulnerabilities || [] }, parser, 'audit');
+      } catch (error) {
+        throw new Error(`Failed to audit package: ${error.message}`);
+      }
     } else {
       try {
         const { stdout } = await execAsync('npm audit --json');
@@ -446,13 +465,20 @@ class NPMCli {
     const packageName = parser.getPositional(0);
     if (!packageName) throw new Error('Missing package name');
     
-    const depth = parseInt(parser.get('depth', '3'));
-    const includeDev = parser.has('include-dev');
-    
     console.log(c('blue', `${emoji.deps} Analyzing dependencies: ${packageName}`));
-    const depsTree = await this.scanner.getDependencyTree(packageName, { depth, includeDev });
     
-    await this.outputResults(depsTree, parser, 'deps');
+    try {
+      const info = await this.scanner.scan(packageName, { includeDependencies: true });
+      const depsTree = {
+        name: packageName,
+        version: info.version,
+        dependencies: info.dependencies || []
+      };
+      
+      await this.outputResults(depsTree, parser, 'deps');
+    } catch (error) {
+      throw new Error(`Failed to analyze dependencies: ${error.message}`);
+    }
   }
 
   async handleOutdated(parser) {
@@ -460,8 +486,19 @@ class NPMCli {
     console.log(c('blue', `${emoji.outdated} Checking outdated packages${packageName ? `: ${packageName}` : ''}...`));
     
     if (packageName) {
-      const outdatedInfo = await this.scanner.checkOutdated(packageName);
-      await this.outputResults(outdatedInfo, parser, 'outdated');
+      try {
+        const info = await this.scanner.scan(packageName);
+        const outdatedInfo = {
+          [packageName]: {
+            current: info.version,
+            wanted: info.version,
+            latest: info['dist-tags']?.latest || info.version
+          }
+        };
+        await this.outputResults(outdatedInfo, parser, 'outdated');
+      } catch (error) {
+        throw new Error(`Failed to check outdated: ${error.message}`);
+      }
     } else {
       try {
         const { stdout } = await execAsync('npm outdated --json');
@@ -478,11 +515,20 @@ class NPMCli {
     if (!packageName) throw new Error('Missing package name');
     
     console.log(c('blue', `${emoji.size} Analyzing bundle size: ${packageName}`));
-    const sizeInfo = await this.scanner.getBundleSize(packageName, {
-      includeDev: parser.has('include-dev')
-    });
     
-    await this.outputResults(sizeInfo, parser, 'size');
+    try {
+      const info = await this.scanner.scan(packageName, { includeDependencies: true });
+      const sizeInfo = {
+        name: packageName,
+        size: info.size || 0,
+        gzip: info.gzip || 0,
+        dependencies: info.dependencies || []
+      };
+      
+      await this.outputResults(sizeInfo, parser, 'size');
+    } catch (error) {
+      throw new Error(`Failed to analyze size: ${error.message}`);
+    }
   }
 
   async handleHistory(parser) {
@@ -492,9 +538,22 @@ class NPMCli {
     const limit = parseInt(parser.get('limit', '10'));
     
     console.log(c('blue', `${emoji.history} Fetching version history: ${packageName}`));
-    const history = await this.scanner.getVersionHistory(packageName, { limit });
     
-    await this.outputResults(history, parser, 'history');
+    try {
+      const info = await this.scanner.scan(packageName);
+      const versions = info.versions ? Object.entries(info.versions)
+        .sort((a, b) => new Date(b[1].date || 0) - new Date(a[1].date || 0))
+        .slice(0, limit)
+        .map(([version, data]) => ({
+          version,
+          date: data.date,
+          changes: []
+        })) : [];
+      
+      await this.outputResults({ versions }, parser, 'history');
+    } catch (error) {
+      throw new Error(`Failed to fetch history: ${error.message}`);
+    }
   }
 
   async handleStats(parser) {
@@ -502,9 +561,29 @@ class NPMCli {
     if (!packageName) throw new Error('Missing package name');
     
     console.log(c('blue', `${emoji.stats} Collecting statistics: ${packageName}`));
-    const stats = await this.scanner.getDetailedStats(packageName);
     
-    await this.outputResults(stats, parser, 'stats');
+    try {
+      const info = await this.scanner.scan(packageName, {
+        includeDownloads: true,
+        includeDependencies: true
+      });
+      
+      const stats = {
+        name: info.name,
+        version: info.version,
+        downloads: info.downloads,
+        github: info.github || {},
+        dependenciesCount: info.dependencies?.length || 0,
+        size: info.size || {},
+        lastModified: info.date,
+        maintainers: info.maintainers || [],
+        keywords: info.keywords || []
+      };
+      
+      await this.outputResults(stats, parser, 'stats');
+    } catch (error) {
+      throw new Error(`Failed to collect stats: ${error.message}`);
+    }
   }
 
   async handleExport(parser) {
@@ -513,10 +592,15 @@ class NPMCli {
     
     console.log(c('blue', `${emoji.export} Exporting data in ${format} format...`));
     
-    const data = await this.scanner.exportData(format);
-    await writeFile(output, data);
-    
-    console.log(c('green', `${emoji.success} Data exported to: ${output}`));
+    try {
+      const packageJson = JSON.parse(await readFile('package.json', 'utf-8'));
+      const data = format === 'json' ? JSON.stringify(packageJson, null, 2) : JSON.stringify(packageJson);
+      
+      await writeFile(output, data);
+      console.log(c('green', `${emoji.success} Data exported to: ${output}`));
+    } catch (error) {
+      throw new Error('No package.json found in current directory');
+    }
   }
 
   async handleValidate(parser) {
@@ -524,9 +608,29 @@ class NPMCli {
     if (!packageName) throw new Error('Missing package name');
     
     console.log(c('blue', `${emoji.validate} Validating package integrity: ${packageName}`));
-    const validation = await this.scanner.validatePackage(packageName);
     
-    await this.outputResults(validation, parser, 'validate');
+    try {
+      const info = await this.scanner.scan(packageName);
+      const validation = {
+        valid: !!info.name && !!info.version,
+        checks: {
+          'Package exists': !!info.name,
+          'Has version': !!info.version,
+          'Has description': !!info.description,
+          'Has license': !!info.license
+        },
+        issues: [],
+        suggestions: []
+      };
+      
+      if (!info.description) validation.issues.push('Missing description');
+      if (!info.license) validation.issues.push('Missing license');
+      if (!info.repository) validation.suggestions.push('Consider adding repository URL');
+      
+      await this.outputResults(validation, parser, 'validate');
+    } catch (error) {
+      throw new Error(`Failed to validate package: ${error.message}`);
+    }
   }
 
   async handleBackup(parser) {
@@ -590,10 +694,15 @@ class NPMCli {
 
   formatAsCSV(results, type) {
     if (!Array.isArray(results)) results = [results];
+    if (results.length === 0) return '';
     
     const headers = Object.keys(results[0] || {});
     const rows = results.map(item => 
-      headers.map(header => `"${String(item[header] || '').replace(/"/g, '""')}"`).join(',')
+      headers.map(header => {
+        const value = item[header];
+        const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value || '');
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }).join(',')
     );
     
     return [headers.join(','), ...rows].join('\n');
@@ -610,7 +719,7 @@ class NPMCli {
       
       Object.entries(item).forEach(([key, value]) => {
         if (typeof value === 'object' && value !== null) {
-          md += `**${key}:** ${JSON.stringify(value, null, 2)}\n\n`;
+          md += `**${key}:** \`${JSON.stringify(value)}\`\n\n`;
         } else {
           md += `**${key}:** ${value}\n\n`;
         }
@@ -712,9 +821,10 @@ class NPMCli {
 
     if (health) {
       console.log('\n' + c('bold', 'Health Metrics:'));
-      console.log(`  Quality:     ${c(OutputFormatter.getHealthColor(health.quality), health.quality)} ${OutputFormatter.getHealthEmoji(health.quality)}`);
-      console.log(`  Popularity:  ${c(OutputFormatter.getHealthColor(health.popularity), health.popularity)} ${OutputFormatter.getHealthEmoji(health.popularity)}`);
-      console.log(`  Maintenance: ${c(OutputFormatter.getHealthColor(health.maintenance), health.maintenance)} ${OutputFormatter.getHealthEmoji(health.maintenance)}`);
+      console.log(`  Quality:     ${c(OutputFormatter.getHealthColor(health.quality), `${(health.quality * 100).toFixed(0)}%`)} ${OutputFormatter.getHealthEmoji(health.quality)}`);
+      console.log(`  Popularity:  ${c(OutputFormatter.getHealthColor(health.popularity), `${(health.popularity * 100).toFixed(0)}%`)} ${OutputFormatter.getHealthEmoji(health.popularity)}`);
+      console.log(`  Maintenance: ${c(OutputFormatter.getHealthColor(health.maintenance), `${(health.maintenance * 100).toFixed(0)}%`)} ${OutputFormatter.getHealthEmoji(health.maintenance)}`);
+
     }
 
     if (info.dependencies?.length > 0) {
