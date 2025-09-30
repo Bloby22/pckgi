@@ -23,6 +23,7 @@ class HttpClient {
     for (let attempt = 0; attempt <= this.retries; attempt++) {
       try {
         const response = await fetch(url, fetchOptions);
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -32,14 +33,13 @@ class HttpClient {
         return { data, status: response.status };
       } catch (error) {
         lastError = error;
+        clearTimeout(timeoutId);
         
         if (attempt === this.retries || error.name === 'AbortError') {
           break;
         }
         
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
-      } finally {
-        clearTimeout(timeoutId);
       }
     }
     
@@ -94,6 +94,29 @@ const utils = {
     if (score >= 40) return { status: 'fair', score };
     if (score >= 20) return { status: 'poor', score };
     return { status: 'critical', score };
+  },
+
+  calculatePopularityScore(downloads) {
+    if (downloads >= 1000000) return 100;
+    if (downloads >= 100000) return 90;
+    if (downloads >= 10000) return 80;
+    if (downloads >= 1000) return 70;
+    if (downloads >= 100) return 60;
+    if (downloads >= 10) return 50;
+    return 30;
+  },
+
+  calculateMaintenanceScore(daysSinceUpdate, totalVersions) {
+    let score = 100;
+    
+    if (daysSinceUpdate > 730) score = 30;
+    else if (daysSinceUpdate > 365) score = 60;
+    else if (daysSinceUpdate > 180) score = 80;
+    else if (daysSinceUpdate > 90) score = 90;
+    
+    if (totalVersions < 3) score -= 10;
+    
+    return Math.max(0, score);
   },
 
   formatNumber(num) {
@@ -163,11 +186,13 @@ class NPMScanner {
           author: pkg.author?.name || pkg.publisher?.username || 'Unknown',
           keywords: pkg.keywords || [],
           license: pkg.license || 'Unknown',
+          date: pkg.date,
+          downloads: pkg.downloads || 0,
           score: {
-            final: Math.round(obj.score.final * 100),
-            quality: Math.round(obj.score.detail.quality * 100),
-            popularity: Math.round(obj.score.detail.popularity * 100),
-            maintenance: Math.round(obj.score.detail.maintenance * 100)
+            final: obj.score.final,
+            quality: obj.score.detail.quality,
+            popularity: obj.score.detail.popularity,
+            maintenance: obj.score.detail.maintenance
           },
           links: pkg.links || {},
           publishedAt: pkg.date
@@ -226,7 +251,11 @@ class NPMScanner {
       const peerDependencies = versionInfo.peerDependencies || {};
       
       const isDeprecated = Boolean(versionInfo.deprecated);
+      const totalVersions = Object.keys(packageData.versions || {}).length;
       const health = utils.calculateHealth(daysSinceUpdate, weekDownloads, isDeprecated);
+      const popularityScore = utils.calculatePopularityScore(weekDownloads);
+      const maintenanceScore = utils.calculateMaintenanceScore(daysSinceUpdate, totalVersions);
+      const qualityScore = health.score;
 
       const result = {
         name: packageData.name,
@@ -236,37 +265,59 @@ class NPMScanner {
         author: versionInfo?.author?.name || packageData.author?.name || 'Unknown',
         license: versionInfo?.license || packageData.license || 'Unknown',
         
+        date: lastUpdate.toISOString(),
         createdAt: createdAt.toISOString().split('T')[0],
         lastUpdate: lastUpdate.toISOString().split('T')[0],
         daysSinceUpdate,
         packageAge,
-        
+
         downloads: {
-          week: weekDownloads,
-          month: monthDownloads,
-          weekFormatted: utils.formatNumber(weekDownloads),
-          monthFormatted: utils.formatNumber(monthDownloads)
+          weekly: weekDownloads,
+          monthly: monthDownloads
+        },
+
+        health: {
+          quality: qualityScore / 100,
+          popularity: popularityScore / 100,
+          maintenance: maintenanceScore / 100
+        },
+
+
+        size: 0,
+        gzip: 0,
+        vulnerabilities: [],
+
+        score: {
+          final: ((qualityScore + popularityScore + maintenanceScore) / 300),
+          quality: qualityScore / 100,
+          popularity: popularityScore / 100,
+          maintenance: maintenanceScore / 100
         },
         
-        health: health.status,
-        healthScore: health.score,
         deprecated: isDeprecated,
         deprecatedMessage: versionInfo.deprecated || null,
-        
-        totalVersions: Object.keys(packageData.versions || {}).length,
-        dependencies: {
-          prod: Object.keys(dependencies).length,
-          dev: Object.keys(devDependencies).length,
-          peer: Object.keys(peerDependencies).length,
-          total: Object.keys({...dependencies, ...devDependencies, ...peerDependencies}).length
-        },
-        
-        maintainers: packageData.maintainers?.length || 0,
+
+        totalVersions,
+        dependencies: Object.keys(dependencies).length > 0 ? 
+          Object.entries(dependencies).map(([name, version]) => ({
+            name,
+            version
+          })) : [],
+
+        maintainers: packageData.maintainers || [],
         keywords: packageData.keywords || versionInfo.keywords || [],
         homepage: versionInfo.homepage || packageData.homepage,
         repository: versionInfo.repository || packageData.repository,
         bugs: versionInfo.bugs || packageData.bugs,
-        
+
+        links: {
+          npm: `https://www.npmjs.com/package/${packageData.name}`,
+          homepage: versionInfo.homepage || packageData.homepage,
+          repository: typeof (versionInfo.repository || packageData.repository) === 'object' 
+            ? (versionInfo.repository || packageData.repository).url 
+            : (versionInfo.repository || packageData.repository)
+        },
+
         bundleInfo: {
           hasTypes: Boolean(versionInfo.types || versionInfo.typings),
           main: versionInfo.main,
@@ -275,14 +326,6 @@ class NPMScanner {
           files: versionInfo.files?.length || 0
         }
       };
-
-      if (includeDependencies && Object.keys(dependencies).length > 0) {
-        result.dependencyList = Object.entries(dependencies).map(([name, version]) => ({
-          name,
-          version,
-          versionInfo: utils.parseVersion(version)
-        }));
-      }
 
       this.cache.set(cacheKey, result);
       return result;
@@ -300,15 +343,15 @@ class NPMScanner {
         packageNames.map(name => this.scan(name, options))
       );
       
-      return packageNames.map((name, index) => {
-        const result = results[index];
-        return {
-          name,
-          success: result.status === 'fulfilled',
-          data: result.status === 'fulfilled' ? result.value : null,
-          error: result.status === 'rejected' ? result.reason.message : null
-        };
-      });
+      return results
+        .map((result, index) => {
+          if (result.status === 'fulfilled') {
+            return result.value;
+          }
+          console.error(`Failed to fetch ${packageNames[index]}: ${result.reason.message}`);
+          return null;
+        })
+        .filter(Boolean);
     } catch (error) {
       throw new Error(`Comparison failed: ${error.message}`);
     }
