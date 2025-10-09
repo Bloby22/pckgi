@@ -6,7 +6,7 @@
 
 ## 🚀 Status
 
-- Current version: **v1.2.1**
+- Current version: **v1.2.4**
 - Stable & actively maintained
 - Supports full package scanning, search, comparison, auditing, and more
 - Designed for speed, usability & detailed insights
@@ -108,4 +108,5 @@ pckgi help
 ```bash
 npm install pckgi
 ```
+
 
