@@ -9,6 +9,8 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+// Colors
+
 const colors = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -27,6 +29,8 @@ const colors = {
 };
 
 const c = (color, text) => `${colors[color]}${text}${colors.reset}`;
+
+// Emoji
 
 const emoji = {
   search: '🔍',
@@ -62,6 +66,8 @@ const emoji = {
   security: '🔒'
 };
 
+// Arg Parser
+
 class ArgParser {
   constructor(args) {
     this.args = args;
@@ -74,7 +80,7 @@ class ArgParser {
   parse() {
     for (let i = 1; i < this.args.length; i++) {
       const arg = this.args[i];
-      
+
       if (arg.startsWith('--')) {
         const [key, value] = arg.slice(2).split('=');
         this.flags.set(key, value || true);
@@ -99,6 +105,8 @@ class ArgParser {
   }
 }
 
+// Output Formatter
+
 class OutputFormatter {
   static formatSize(bytes) {
     if (!bytes) return 'Unknown';
@@ -113,7 +121,7 @@ class OutputFormatter {
     const now = new Date();
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
@@ -136,7 +144,7 @@ class OutputFormatter {
       if (status >= 0.6) return 'yellow';
       return 'red';
     }
-    
+
     const colorMap = {
       excellent: 'green',
       good: 'green',
@@ -158,7 +166,7 @@ class OutputFormatter {
       if (status >= 0.6) return '🟡';
       return '🔴';
     }
-    
+
     const emojiMap = {
       excellent: '🟢',
       good: '✅',
@@ -184,7 +192,7 @@ class OutputFormatter {
 
   static createTable(headers, rows) {
     const colWidths = headers.map(header => header.length);
-    
+
     rows.forEach(row => {
       row.forEach((cell, i) => {
         const cleanCell = String(cell).replace(/\x1b\[[0-9;]*m/g, '');
@@ -194,11 +202,11 @@ class OutputFormatter {
 
     const separator = '─'.repeat(colWidths.reduce((a, b) => a + b + 3, 0) - 2);
     const headerRow = headers.map((header, i) => header.padEnd(colWidths[i])).join(' │ ');
-    
+
     let table = `┌${separator}┐\n`;
     table += `│ ${headerRow} │\n`;
     table += `├${separator}┤\n`;
-    
+
     rows.forEach(row => {
       const rowStr = row.map((cell, i) => {
         const cleanCell = String(cell).replace(/\x1b\[[0-9;]*m/g, '');
@@ -207,12 +215,13 @@ class OutputFormatter {
       }).join(' │ ');
       table += `│ ${rowStr} │\n`;
     });
-    
+
     table += `└${separator}┘`;
     return table;
   }
 }
 
+// NPM CLI
 class NPMCli {
   constructor() {
     this.scanner = createScanner({
@@ -224,7 +233,7 @@ class NPMCli {
 
   async run(args) {
     const parser = new ArgParser(args);
-    
+
     if (!parser.command || parser.has('help') || parser.has('h')) {
       this.showHelp();
       return;
@@ -303,15 +312,17 @@ class NPMCli {
     }
   }
 
+  // Help & Version
+
   showHelp() {
     console.log(c('blue', `${emoji.package} pckgi - Modern NPM Package Scanner\n`));
-    
+
     console.log(c('bold', 'CORE COMMANDS:'));
     console.log(`  ${c('cyan', 'search, s')} <query>     ${c('gray', 'Search for packages')}`);
     console.log(`  ${c('cyan', 'scan, i')} <package>    ${c('gray', 'Detailed package analysis')}`);
     console.log(`  ${c('cyan', 'compare, c')} <pkg1,pkg2> ${c('gray', 'Compare multiple packages')}`);
     console.log(`  ${c('cyan', 'trending, t')}           ${c('gray', 'Show trending packages')}\n`);
-    
+
     console.log(c('bold', 'ANALYSIS COMMANDS:'));
     console.log(`  ${c('cyan', 'audit, a')} [package]   ${c('gray', 'Security audit analysis')}`);
     console.log(`  ${c('cyan', 'deps, d')} <package>    ${c('gray', 'Dependency tree analysis')}`);
@@ -319,13 +330,13 @@ class NPMCli {
     console.log(`  ${c('cyan', 'size')} <package>       ${c('gray', 'Bundle size analysis')}`);
     console.log(`  ${c('cyan', 'stats')} <package>      ${c('gray', 'Detailed package statistics')}`);
     console.log(`  ${c('cyan', 'history')} <package>    ${c('gray', 'Version history and changelog')}\n`);
-    
+
     console.log(c('bold', 'UTILITY COMMANDS:'));
     console.log(`  ${c('cyan', 'export, e')} [format]   ${c('gray', 'Export data (json, csv, md)')}`);
     console.log(`  ${c('cyan', 'validate')} <package>   ${c('gray', 'Validate package integrity')}`);
     console.log(`  ${c('cyan', 'backup')}              ${c('gray', 'Backup package.json dependencies')}`);
     console.log(`  ${c('cyan', 'help')}                ${c('gray', 'Show this help message')}\n`);
-    
+
     console.log(c('bold', 'OPTIONS:'));
     console.log(`  ${c('yellow', '--json')}              ${c('gray', 'Output in JSON format')}`);
     console.log(`  ${c('yellow', '--csv')}               ${c('gray', 'Output in CSV format')}`);
@@ -340,7 +351,7 @@ class NPMCli {
     console.log(`  ${c('yellow', '--debug')}             ${c('gray', 'Show debug information')}`);
     console.log(`  ${c('yellow', '--help, -h')}          ${c('gray', 'Show this help')}`);
     console.log(`  ${c('yellow', '--version, -v')}       ${c('gray', 'Show version')}\n`);
-    
+
     console.log(c('bold', 'EXAMPLES:'));
     console.log(c('gray', '  pckgi search react --limit=5'));
     console.log(c('gray', '  pckgi scan lodash --json --output=report.json'));
@@ -362,27 +373,28 @@ class NPMCli {
     }
   }
 
+  // Command Handlers
   async handleSearch(parser) {
     const query = parser.getPositional(0);
     if (!query) throw new Error('Missing search query');
-    
+
     const options = {
       limit: parseInt(parser.get('limit', '10')),
       includeUnstable: parser.has('include-unstable')
     };
 
     if (parser.has('no-cache')) this.scanner.clearCache();
-    
+
     console.log(c('blue', `${emoji.search} Searching: ${query}`));
     const results = await this.scanner.search(query, options);
-    
+
     await this.outputResults(results, parser, 'search');
   }
 
   async handleScan(parser) {
     const packageName = parser.getPositional(0);
     if (!packageName) throw new Error('Missing package name');
-    
+
     const options = {
       includeDownloads: true,
       includeDependencies: !parser.has('no-deps'),
@@ -390,23 +402,23 @@ class NPMCli {
     };
 
     if (parser.has('no-cache')) this.scanner.clearCache();
-    
+
     console.log(c('blue', `${emoji.scan} Analyzing: ${packageName}`));
     const info = await this.scanner.scan(packageName, options);
-    
+
     await this.outputResults(info, parser, 'scan');
   }
 
   async handleCompare(parser) {
     const packagesList = parser.getPositional(0);
     if (!packagesList) throw new Error('Missing package names (use comma-separated list)');
-    
+
     const packages = packagesList.split(',').map(p => p.trim());
     if (packages.length < 2) throw new Error('Need at least 2 packages to compare');
-    
+
     console.log(c('blue', `${emoji.compare} Comparing: ${packages.join(', ')}`));
     const results = await this.scanner.compare(packages);
-    
+
     await this.outputResults(results, parser, 'compare');
   }
 
@@ -414,34 +426,34 @@ class NPMCli {
     const limit = parseInt(parser.get('limit', '10'));
     const trendingQueries = ['react', 'vue', 'angular', 'nodejs', 'typescript'];
     const allResults = [];
-    
+
     console.log(c('blue', `${emoji.fire} Fetching trending packages...`));
-    
+
     for (const query of trendingQueries) {
       try {
         const results = await this.scanner.search(query, { limit: 5 });
         allResults.push(...results);
       } catch (err) {
-        // Ignorujeme chyby při trendingovém vyhledávání
+        // ignore errors during trending search
       }
     }
-    
+
     const unique = new Map();
     allResults.forEach(pkg => {
       if (!unique.has(pkg.name)) unique.set(pkg.name, pkg);
     });
-    
+
     const trending = Array.from(unique.values())
       .sort((a, b) => (b.score?.final || 0) - (a.score?.final || 0))
       .slice(0, limit);
-    
+
     await this.outputResults(trending, parser, 'trending');
   }
 
   async handleAudit(parser) {
     const packageName = parser.getPositional(0);
     console.log(c('blue', `${emoji.audit} Security audit${packageName ? `: ${packageName}` : ''}...`));
-    
+
     if (packageName) {
       try {
         const info = await this.scanner.scan(packageName, { includeVulnerabilities: true });
@@ -464,9 +476,9 @@ class NPMCli {
   async handleDeps(parser) {
     const packageName = parser.getPositional(0);
     if (!packageName) throw new Error('Missing package name');
-    
+
     console.log(c('blue', `${emoji.deps} Analyzing dependencies: ${packageName}`));
-    
+
     try {
       const info = await this.scanner.scan(packageName, { includeDependencies: true });
       const depsTree = {
@@ -474,7 +486,7 @@ class NPMCli {
         version: info.version,
         dependencies: info.dependencies || []
       };
-      
+
       await this.outputResults(depsTree, parser, 'deps');
     } catch (error) {
       throw new Error(`Failed to analyze dependencies: ${error.message}`);
@@ -484,7 +496,7 @@ class NPMCli {
   async handleOutdated(parser) {
     const packageName = parser.getPositional(0);
     console.log(c('blue', `${emoji.outdated} Checking outdated packages${packageName ? `: ${packageName}` : ''}...`));
-    
+
     if (packageName) {
       try {
         const info = await this.scanner.scan(packageName);
@@ -513,9 +525,9 @@ class NPMCli {
   async handleSize(parser) {
     const packageName = parser.getPositional(0);
     if (!packageName) throw new Error('Missing package name');
-    
+
     console.log(c('blue', `${emoji.size} Analyzing bundle size: ${packageName}`));
-    
+
     try {
       const info = await this.scanner.scan(packageName, { includeDependencies: true });
       const sizeInfo = {
@@ -524,7 +536,7 @@ class NPMCli {
         gzip: info.gzip || 0,
         dependencies: info.dependencies || []
       };
-      
+
       await this.outputResults(sizeInfo, parser, 'size');
     } catch (error) {
       throw new Error(`Failed to analyze size: ${error.message}`);
@@ -534,11 +546,11 @@ class NPMCli {
   async handleHistory(parser) {
     const packageName = parser.getPositional(0);
     if (!packageName) throw new Error('Missing package name');
-    
+
     const limit = parseInt(parser.get('limit', '10'));
-    
+
     console.log(c('blue', `${emoji.history} Fetching version history: ${packageName}`));
-    
+
     try {
       const info = await this.scanner.scan(packageName);
       const versions = info.versions ? Object.entries(info.versions)
@@ -549,7 +561,7 @@ class NPMCli {
           date: data.date,
           changes: []
         })) : [];
-      
+
       await this.outputResults({ versions }, parser, 'history');
     } catch (error) {
       throw new Error(`Failed to fetch history: ${error.message}`);
@@ -559,15 +571,15 @@ class NPMCli {
   async handleStats(parser) {
     const packageName = parser.getPositional(0);
     if (!packageName) throw new Error('Missing package name');
-    
+
     console.log(c('blue', `${emoji.stats} Collecting statistics: ${packageName}`));
-    
+
     try {
       const info = await this.scanner.scan(packageName, {
         includeDownloads: true,
         includeDependencies: true
       });
-      
+
       const stats = {
         name: info.name,
         version: info.version,
@@ -579,7 +591,7 @@ class NPMCli {
         maintainers: info.maintainers || [],
         keywords: info.keywords || []
       };
-      
+
       await this.outputResults(stats, parser, 'stats');
     } catch (error) {
       throw new Error(`Failed to collect stats: ${error.message}`);
@@ -589,13 +601,13 @@ class NPMCli {
   async handleExport(parser) {
     const format = parser.getPositional(0) || 'json';
     const output = parser.get('output', `export.${format}`);
-    
+
     console.log(c('blue', `${emoji.export} Exporting data in ${format} format...`));
-    
+
     try {
       const packageJson = JSON.parse(await readFile('package.json', 'utf-8'));
       const data = format === 'json' ? JSON.stringify(packageJson, null, 2) : JSON.stringify(packageJson);
-      
+
       await writeFile(output, data);
       console.log(c('green', `${emoji.success} Data exported to: ${output}`));
     } catch (error) {
@@ -606,9 +618,9 @@ class NPMCli {
   async handleValidate(parser) {
     const packageName = parser.getPositional(0);
     if (!packageName) throw new Error('Missing package name');
-    
+
     console.log(c('blue', `${emoji.validate} Validating package integrity: ${packageName}`));
-    
+
     try {
       const info = await this.scanner.scan(packageName);
       const validation = {
@@ -622,11 +634,11 @@ class NPMCli {
         issues: [],
         suggestions: []
       };
-      
+
       if (!info.description) validation.issues.push('Missing description');
       if (!info.license) validation.issues.push('Missing license');
       if (!info.repository) validation.suggestions.push('Consider adding repository URL');
-      
+
       await this.outputResults(validation, parser, 'validate');
     } catch (error) {
       throw new Error(`Failed to validate package: ${error.message}`);
@@ -635,9 +647,9 @@ class NPMCli {
 
   async handleBackup(parser) {
     const output = parser.get('output', 'package-backup.json');
-    
+
     console.log(c('blue', `${emoji.backup} Creating dependencies backup...`));
-    
+
     try {
       const packageJson = JSON.parse(await readFile('package.json', 'utf-8'));
       const backup = {
@@ -648,7 +660,7 @@ class NPMCli {
         peerDependencies: packageJson.peerDependencies || {},
         timestamp: new Date().toISOString()
       };
-      
+
       await writeFile(output, JSON.stringify(backup, null, 2));
       console.log(c('green', `${emoji.success} Backup created: ${output}`));
     } catch (error) {
@@ -656,12 +668,13 @@ class NPMCli {
     }
   }
 
+  // Output
   async outputResults(results, parser, type) {
     const format = this.getOutputFormat(parser);
     const output = parser.get('output');
-    
+
     let formattedOutput;
-    
+
     switch (format) {
       case 'json':
         formattedOutput = JSON.stringify(results, null, 2);
@@ -676,7 +689,7 @@ class NPMCli {
         this.displayResults(results, type, parser);
         return;
     }
-    
+
     if (output) {
       await writeFile(output, formattedOutput);
       console.log(c('green', `${emoji.success} Output saved to: ${output}`));
@@ -695,28 +708,28 @@ class NPMCli {
   formatAsCSV(results, type) {
     if (!Array.isArray(results)) results = [results];
     if (results.length === 0) return '';
-    
+
     const headers = Object.keys(results[0] || {});
-    const rows = results.map(item => 
+    const rows = results.map(item =>
       headers.map(header => {
         const value = item[header];
         const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value || '');
         return `"${stringValue.replace(/"/g, '""')}"`;
       }).join(',')
     );
-    
+
     return [headers.join(','), ...rows].join('\n');
   }
 
   formatAsMarkdown(results, type) {
     if (!Array.isArray(results)) results = [results];
-    
+
     let md = `# Package Analysis Report\n\n`;
     md += `Generated: ${new Date().toISOString()}\n\n`;
-    
+
     results.forEach((item, index) => {
       md += `## ${item.name || `Item ${index + 1}`}\n\n`;
-      
+
       Object.entries(item).forEach(([key, value]) => {
         if (typeof value === 'object' && value !== null) {
           md += `**${key}:** \`${JSON.stringify(value)}\`\n\n`;
@@ -725,10 +738,11 @@ class NPMCli {
         }
       });
     });
-    
+
     return md;
   }
 
+  // Display Methods
   displayResults(results, type, parser) {
     switch (type) {
       case 'search':
@@ -774,44 +788,44 @@ class NPMCli {
       console.log(c('yellow', `${emoji.warning} No packages found`));
       return;
     }
-    
+
     console.log(c('green', `\n${emoji.success} Found ${results.length} packages:\n`));
-    
+
     results.forEach((pkg, i) => {
       const rank = c('dim', `${i + 1}.`.padEnd(3));
       const name = c('bold', pkg.name);
       const version = c('gray', `v${pkg.version}`);
       const score = this.formatScore(pkg.score);
       const author = pkg.author ? c('gray', ` by ${pkg.author}`) : '';
-      
+
       console.log(`${rank} ${name} ${version} ${score}${author}`);
       console.log(c('dim', `   ${pkg.description?.slice(0, 80) || 'No description'}${pkg.description?.length > 80 ? '...' : ''}`));
-      
+
       if (pkg.keywords?.length > 0) {
         const keywords = pkg.keywords.slice(0, 3).map(k => c('cyan', `#${k}`)).join(' ');
         console.log(c('dim', `   ${keywords}`));
       }
-      
+
       if (parser.has('verbose')) {
         console.log(c('dim', `   ${emoji.downloads} ${OutputFormatter.formatNumber(pkg.downloads || 0)} weekly downloads`));
         console.log(c('dim', `   ${emoji.clock} Updated ${OutputFormatter.formatDate(pkg.date)}`));
       }
-      
+
       console.log();
     });
   }
 
   displayPackageInfo(info) {
     const { name, version, description, date, health, popularity, maintenance, license, author, links } = info;
-    
+
     console.log(`\n${c('bold', name)} ${c('gray', `v${version}`)}`);
     if (description) console.log(description);
-    
+
     console.log('\n' + c('bold', 'Package Information:'));
     if (author) console.log(`${emoji.author} Author: ${author}`);
     if (license) console.log(`${emoji.license} License: ${license}`);
     if (date) console.log(`${emoji.clock} Updated: ${OutputFormatter.formatDate(date)}`);
-    
+
     if (links) {
       console.log('\n' + c('bold', 'Links:'));
       if (links.homepage) console.log(`🏠 Homepage: ${links.homepage}`);
@@ -824,7 +838,6 @@ class NPMCli {
       console.log(`  Quality:     ${c(OutputFormatter.getHealthColor(health.quality), `${(health.quality * 100).toFixed(0)}%`)} ${OutputFormatter.getHealthEmoji(health.quality)}`);
       console.log(`  Popularity:  ${c(OutputFormatter.getHealthColor(health.popularity), `${(health.popularity * 100).toFixed(0)}%`)} ${OutputFormatter.getHealthEmoji(health.popularity)}`);
       console.log(`  Maintenance: ${c(OutputFormatter.getHealthColor(health.maintenance), `${(health.maintenance * 100).toFixed(0)}%`)} ${OutputFormatter.getHealthEmoji(health.maintenance)}`);
-
     }
 
     if (info.dependencies?.length > 0) {
@@ -832,7 +845,7 @@ class NPMCli {
       info.dependencies.slice(0, 10).forEach(dep => {
         console.log(`  ${emoji.dependencies} ${dep.name} ${c('gray', `v${dep.version}`)}`);
       });
-      
+
       if (info.dependencies.length > 10) {
         console.log(c('dim', `  ... and ${info.dependencies.length - 10} more`));
       }
@@ -849,7 +862,7 @@ class NPMCli {
 
   displayComparison(results) {
     console.log(`\n${c('bold', 'Package Comparison:')}\n`);
-    
+
     const headers = ['Package', 'Version', 'Quality', 'Popularity', 'Maintenance', 'Score'];
     const rows = results.map(pkg => [
       c('bold', pkg.name),
@@ -859,9 +872,9 @@ class NPMCli {
       c(OutputFormatter.getHealthColor(pkg.score?.maintenance || 0), `${((pkg.score?.maintenance || 0) * 100).toFixed(1)}%`),
       c('yellow', `${((pkg.score?.final || 0) * 100).toFixed(1)}%`)
     ]);
-    
+
     console.log(OutputFormatter.createTable(headers, rows));
-    
+
     results.forEach(pkg => {
       console.log(`\n${c('bold', pkg.name)}:`);
       console.log(`  ${pkg.description?.slice(0, 100) || 'No description'}${pkg.description?.length > 100 ? '...' : ''}`);
@@ -876,46 +889,46 @@ class NPMCli {
 
   displayTrendingResults(results, parser) {
     console.log(c('green', `\n${emoji.star} Trending packages:\n`));
-    
+
     results.forEach((pkg, i) => {
       const rank = c('dim', `${i + 1}.`.padEnd(3));
       const name = c('bold', pkg.name);
       const version = c('gray', `v${pkg.version}`);
       const score = this.formatScore(pkg.score);
-      
+
       console.log(`${rank} ${name} ${version} ${score}`);
       console.log(c('dim', `   ${pkg.description?.slice(0, 80) || 'No description'}${pkg.description?.length > 80 ? '...' : ''}`));
-      
+
       if (pkg.keywords?.length > 0) {
         const keywords = pkg.keywords.slice(0, 3).map(k => c('cyan', `#${k}`)).join(' ');
         console.log(c('dim', `   ${keywords}`));
       }
-      
+
       console.log();
     });
   }
 
   displayAuditResults(results) {
     console.log(`\n${c('bold', 'Security Audit Results:')}\n`);
-    
+
     if (results.vulnerabilities?.length === 0) {
       console.log(c('green', `${emoji.success} No vulnerabilities found!`));
       return;
     }
-    
+
     if (results.vulnerabilities) {
       const groupedVulns = results.vulnerabilities.reduce((acc, vuln) => {
         acc[vuln.severity] = (acc[vuln.severity] || 0) + 1;
         return acc;
       }, {});
-      
+
       console.log(c('bold', 'Vulnerability Summary:'));
       Object.entries(groupedVulns).forEach(([severity, count]) => {
         const color = OutputFormatter.getHealthColor(severity);
         const emoji_type = OutputFormatter.getHealthEmoji(severity);
         console.log(`  ${emoji_type} ${severity.toUpperCase()}: ${c(color, count.toString())}`);
       });
-      
+
       console.log(`\n${c('bold', 'Detailed Vulnerabilities:')}`);
       results.vulnerabilities.slice(0, 10).forEach((vuln, i) => {
         const severity = c(OutputFormatter.getHealthColor(vuln.severity), vuln.severity.toUpperCase());
@@ -931,14 +944,14 @@ class NPMCli {
 
   displayDependencyTree(tree) {
     console.log(`\n${c('bold', 'Dependency Tree:')}\n`);
-    
+
     const displayNode = (node, prefix = '', isLast = true) => {
       const connector = isLast ? '└── ' : '├── ';
       const name = c('bold', node.name);
       const version = c('gray', `@${node.version}`);
-      
+
       console.log(`${prefix}${connector}${name}${version}`);
-      
+
       if (node.dependencies && node.dependencies.length > 0) {
         const newPrefix = prefix + (isLast ? '    ' : '│   ');
         node.dependencies.forEach((dep, index) => {
@@ -947,7 +960,7 @@ class NPMCli {
         });
       }
     };
-    
+
     if (Array.isArray(tree)) {
       tree.forEach((node, index) => {
         displayNode(node, '', index === tree.length - 1);
@@ -959,12 +972,12 @@ class NPMCli {
 
   displayOutdatedResults(results) {
     console.log(`\n${c('bold', 'Outdated Packages:')}\n`);
-    
+
     if (Object.keys(results).length === 0) {
       console.log(c('green', `${emoji.success} All packages are up to date!`));
       return;
     }
-    
+
     const headers = ['Package', 'Current', 'Wanted', 'Latest'];
     const rows = Object.entries(results).map(([name, info]) => [
       c('bold', name),
@@ -972,24 +985,24 @@ class NPMCli {
       c('yellow', info.wanted),
       c('green', info.latest)
     ]);
-    
+
     console.log(OutputFormatter.createTable(headers, rows));
   }
 
   displaySizeResults(results) {
     console.log(`\n${c('bold', 'Bundle Size Analysis:')}\n`);
-    
+
     console.log(`${emoji.size} Package: ${c('bold', results.name)}`);
     console.log(`📦 Minified: ${c('green', OutputFormatter.formatSize(results.size))}`);
     console.log(`🗜️  Gzipped: ${c('blue', OutputFormatter.formatSize(results.gzip))}`);
-    
+
     if (results.dependencies) {
       console.log(`\n${c('bold', 'Size Breakdown:')}`);
-      
+
       const sortedDeps = results.dependencies
         .sort((a, b) => b.size - a.size)
         .slice(0, 10);
-      
+
       sortedDeps.forEach(dep => {
         const percentage = ((dep.size / results.size) * 100).toFixed(1);
         const bar = OutputFormatter.createProgressBar(dep.size, results.size, 15);
@@ -1001,16 +1014,16 @@ class NPMCli {
 
   displayHistoryResults(results) {
     console.log(`\n${c('bold', 'Version History:')}\n`);
-    
+
     if (results.versions) {
       results.versions.forEach((version, index) => {
         const isLatest = index === 0;
         const versionColor = isLatest ? 'green' : 'gray';
         const tag = isLatest ? c('green', ' [LATEST]') : '';
-        
+
         console.log(`${emoji.version} ${c(versionColor, `v${version.version}`)}${tag}`);
         console.log(`   Released: ${OutputFormatter.formatDate(version.date)}`);
-        
+
         if (version.changes && version.changes.length > 0) {
           console.log(`   Changes:`);
           version.changes.slice(0, 3).forEach(change => {
@@ -1024,7 +1037,7 @@ class NPMCli {
 
   displayStatsResults(results) {
     console.log(`\n${c('bold', 'Package Statistics:')}\n`);
-    
+
     console.log(`${emoji.package} Package: ${c('bold', results.name)} v${results.version}`);
     console.log(`${emoji.downloads} Downloads: ${OutputFormatter.formatNumber(results.downloads?.weekly || 0)} weekly`);
     console.log(`${emoji.star} GitHub Stars: ${OutputFormatter.formatNumber(results.github?.stars || 0)}`);
@@ -1032,14 +1045,14 @@ class NPMCli {
     console.log(`${emoji.dependencies} Dependencies: ${results.dependenciesCount || 0}`);
     console.log(`${emoji.size} Bundle Size: ${OutputFormatter.formatSize(results.size?.minified || 0)}`);
     console.log(`${emoji.clock} Last Updated: ${OutputFormatter.formatDate(results.lastModified)}`);
-    
+
     if (results.maintainers?.length > 0) {
       console.log(`\n${c('bold', 'Maintainers:')}`);
       results.maintainers.slice(0, 5).forEach(maintainer => {
         console.log(`  ${emoji.author} ${maintainer.name || maintainer.email}`);
       });
     }
-    
+
     if (results.keywords?.length > 0) {
       console.log(`\n${c('bold', 'Keywords:')}`);
       const keywords = results.keywords.map(k => c('cyan', `#${k}`)).join(' ');
@@ -1049,31 +1062,31 @@ class NPMCli {
 
   displayValidationResults(results) {
     console.log(`\n${c('bold', 'Package Validation Results:')}\n`);
-    
+
     const statusColor = results.valid ? 'green' : 'red';
     const statusEmoji = results.valid ? emoji.success : emoji.error;
-    
+
     console.log(`${statusEmoji} Status: ${c(statusColor, results.valid ? 'VALID' : 'INVALID')}`);
-    
+
     if (results.checks) {
       console.log(`\n${c('bold', 'Validation Checks:')}`);
-      
+
       Object.entries(results.checks).forEach(([check, passed]) => {
         const checkEmoji = passed ? emoji.success : emoji.error;
         const checkColor = passed ? 'green' : 'red';
         const status = passed ? 'PASS' : 'FAIL';
-        
+
         console.log(`  ${checkEmoji} ${check}: ${c(checkColor, status)}`);
       });
     }
-    
+
     if (results.issues?.length > 0) {
       console.log(`\n${c('bold', 'Issues Found:')}`);
       results.issues.forEach((issue, index) => {
         console.log(`  ${index + 1}. ${c('red', issue)}`);
       });
     }
-    
+
     if (results.suggestions?.length > 0) {
       console.log(`\n${c('bold', 'Suggestions:')}`);
       results.suggestions.forEach((suggestion, index) => {
@@ -1082,6 +1095,7 @@ class NPMCli {
     }
   }
 
+  // Score Formatter
   formatScore(score) {
     if (!score) return '';
     const final = (score.final * 100).toFixed(1);
@@ -1090,7 +1104,6 @@ class NPMCli {
   }
 }
 
+// Entry Point
 const cli = new NPMCli();
 await cli.run(process.argv.slice(2));
-
-
