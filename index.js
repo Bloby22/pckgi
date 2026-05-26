@@ -1,3 +1,4 @@
+// HTTP Client
 class HttpClient {
   constructor(timeout = 5000, retries = 2) {
     this.timeout = timeout;
@@ -7,7 +8,7 @@ class HttpClient {
   async get(url, options = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-    
+
     const fetchOptions = {
       ...options,
       signal: controller.signal,
@@ -19,33 +20,35 @@ class HttpClient {
     };
 
     let lastError;
-    
+
     for (let attempt = 0; attempt <= this.retries; attempt++) {
       try {
         const response = await fetch(url, fetchOptions);
         clearTimeout(timeoutId);
-        
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         return { data, status: response.status };
       } catch (error) {
         lastError = error;
         clearTimeout(timeoutId);
-        
+
         if (attempt === this.retries || error.name === 'AbortError') {
           break;
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
       }
     }
-    
+
     throw lastError;
   }
 }
+
+// Result
 
 class ResultCache {
   constructor(ttl = 5 * 60 * 1000) {
@@ -56,12 +59,12 @@ class ResultCache {
   get(key) {
     const item = this.cache.get(key);
     if (!item) return null;
-    
+
     if (Date.now() - item.timestamp > this.ttl) {
       this.cache.delete(key);
       return null;
     }
-    
+
     return item.data;
   }
 
@@ -74,21 +77,22 @@ class ResultCache {
   }
 }
 
+// Utils
 const utils = {
   calculateHealth(daysSinceUpdate, downloads, isDeprecated, hasVulnerabilities = false) {
     if (isDeprecated) return { status: 'deprecated', score: 0 };
     if (hasVulnerabilities) return { status: 'vulnerable', score: 20 };
-    
+
     let score = 100;
-    
+
     if (daysSinceUpdate > 1095) score -= 60;
-    else if (daysSinceUpdate > 730) score -= 40;  
+    else if (daysSinceUpdate > 730) score -= 40;
     else if (daysSinceUpdate > 365) score -= 20;
-    
+
     if (downloads < 10) score -= 30;
     else if (downloads < 100) score -= 15;
     else if (downloads < 1000) score -= 5;
-    
+
     if (score >= 80) return { status: 'excellent', score };
     if (score >= 60) return { status: 'good', score };
     if (score >= 40) return { status: 'fair', score };
@@ -108,14 +112,14 @@ const utils = {
 
   calculateMaintenanceScore(daysSinceUpdate, totalVersions) {
     let score = 100;
-    
+
     if (daysSinceUpdate > 730) score = 30;
     else if (daysSinceUpdate > 365) score = 60;
     else if (daysSinceUpdate > 180) score = 80;
     else if (daysSinceUpdate > 90) score = 90;
-    
+
     if (totalVersions < 3) score -= 10;
-    
+
     return Math.max(0, score);
   },
 
@@ -129,9 +133,9 @@ const utils = {
   parseVersion(version) {
     const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*))?(?:\+([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*))?$/;
     const match = version?.match(semverRegex);
-    
+
     if (!match) return null;
-    
+
     return {
       major: parseInt(match[1]),
       minor: parseInt(match[2]),
@@ -143,6 +147,7 @@ const utils = {
   }
 };
 
+// NPM Scanner
 class NPMScanner {
   constructor(options = {}) {
     this.client = new HttpClient(options.timeout, options.retries);
@@ -173,11 +178,11 @@ class NPMScanner {
       url.searchParams.set('maintenance', maintenance);
 
       const { data } = await this.client.get(url.toString());
-      
+
       let results = data.objects?.map(obj => {
         const pkg = obj.package;
         const versionInfo = utils.parseVersion(pkg.version);
-        
+
         return {
           name: pkg.name,
           description: pkg.description || 'No description available',
@@ -212,7 +217,7 @@ class NPMScanner {
 
   async scan(packageName, options = {}) {
     const { includeDownloads = true, includeDependencies = true } = options;
-    
+
     const cacheKey = `scan:${packageName}:${JSON.stringify(options)}`;
     const cached = this.cache.get(cacheKey);
     if (cached) return cached;
@@ -236,7 +241,7 @@ class NPMScanner {
 
       const latest = packageData['dist-tags']?.latest;
       const versionInfo = packageData.versions?.[latest];
-      
+
       if (!latest || !versionInfo) {
         throw new Error('Package has no valid versions');
       }
@@ -249,7 +254,7 @@ class NPMScanner {
       const dependencies = versionInfo.dependencies || {};
       const devDependencies = versionInfo.devDependencies || {};
       const peerDependencies = versionInfo.peerDependencies || {};
-      
+
       const isDeprecated = Boolean(versionInfo.deprecated);
       const totalVersions = Object.keys(packageData.versions || {}).length;
       const health = utils.calculateHealth(daysSinceUpdate, weekDownloads, isDeprecated);
@@ -264,7 +269,7 @@ class NPMScanner {
         description: packageData.description || versionInfo.description || 'No description',
         author: versionInfo?.author?.name || packageData.author?.name || 'Unknown',
         license: versionInfo?.license || packageData.license || 'Unknown',
-        
+
         date: lastUpdate.toISOString(),
         createdAt: createdAt.toISOString().split('T')[0],
         lastUpdate: lastUpdate.toISOString().split('T')[0],
@@ -282,7 +287,6 @@ class NPMScanner {
           maintenance: maintenanceScore / 100
         },
 
-
         size: 0,
         gzip: 0,
         vulnerabilities: [],
@@ -293,12 +297,12 @@ class NPMScanner {
           popularity: popularityScore / 100,
           maintenance: maintenanceScore / 100
         },
-        
+
         deprecated: isDeprecated,
         deprecatedMessage: versionInfo.deprecated || null,
 
         totalVersions,
-        dependencies: Object.keys(dependencies).length > 0 ? 
+        dependencies: Object.keys(dependencies).length > 0 ?
           Object.entries(dependencies).map(([name, version]) => ({
             name,
             version
@@ -313,8 +317,8 @@ class NPMScanner {
         links: {
           npm: `https://www.npmjs.com/package/${packageData.name}`,
           homepage: versionInfo.homepage || packageData.homepage,
-          repository: typeof (versionInfo.repository || packageData.repository) === 'object' 
-            ? (versionInfo.repository || packageData.repository).url 
+          repository: typeof (versionInfo.repository || packageData.repository) === 'object'
+            ? (versionInfo.repository || packageData.repository).url
             : (versionInfo.repository || packageData.repository)
         },
 
@@ -342,7 +346,7 @@ class NPMScanner {
       const results = await Promise.allSettled(
         packageNames.map(name => this.scan(name, options))
       );
-      
+
       return results
         .map((result, index) => {
           if (result.status === 'fulfilled') {
@@ -363,9 +367,7 @@ class NPMScanner {
 }
 
 const createScanner = (options = {}) => new NPMScanner(options);
-
 export { NPMScanner, createScanner, utils };
-
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { NPMScanner, createScanner, utils };
 }
