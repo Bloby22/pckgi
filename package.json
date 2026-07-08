@@ -8,6 +8,7 @@
     "pckgi": "./cli.js"
   },
   "scripts": {
+    "test": "echo \"No tests yet\"",
     "search": "node cli.js search",
     "scan": "node cli.js scan"
   },
